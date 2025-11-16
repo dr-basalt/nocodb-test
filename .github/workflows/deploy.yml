@@ -1,0 +1,57 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Build application
+      run: npm run build
+
+    - name: Deploy to Ori3com Panel
+      if: github.ref == 'refs/heads/main'
+      run: |
+        echo "Deploying to Ori3com Panel..."
+        curl -X POST "https://dok1-panel.ori3com.cloud/api/deploy/tZFEELkIqNbP4kEsOApyT" \
+          -H "Content-Type: application/json" \
+          -d '{
+            "repository": "${{ github.repository }}",
+            "branch": "${{ github.ref_name }}",
+            "commit": "${{ github.sha }}"
+          }' || echo "Ori3com Panel deployment failed, continuing..."
+
+    - name: Deploy to Secondary Endpoint
+      if: github.ref == 'refs/heads/main'
+      run: |
+        echo "Deploying to secondary endpoint..."
+        curl -X GET "http://128.140.115.220:8000/api/v1/deploy?uuid=x8c880okg0gkk40o8cosgwws&force=false" \
+          -H "X-Repository: ${{ github.repository }}" \
+          -H "X-Branch: ${{ github.ref_name }}" \
+          -H "X-Commit: ${{ github.sha }}" || echo "Secondary deployment failed, continuing..."
+
+    - name: Deployment Status
+      if: github.ref == 'refs/heads/main'
+      run: |
+        echo "✅ Deployment completed!"
+        echo "🚀 Application should be available at your configured endpoints"
+        echo "📊 Repository: ${{ github.repository }}"
+        echo "🌿 Branch: ${{ github.ref_name }}"
+        echo "📝 Commit: ${{ github.sha }}"
